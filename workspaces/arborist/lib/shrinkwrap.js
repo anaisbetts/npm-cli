@@ -118,6 +118,21 @@ const metaFieldFromPkg = (pkg, key) => {
     if (key === 'license' && typeof val === 'object' && val.type) {
       return val.type
     }
+    // Convert workspace: protocol to file: protocol for dependency fields
+    if ((key === 'dependencies' || key === 'devDependencies' || 
+         key === 'optionalDependencies' || key === 'peerDependencies') && 
+        typeof val === 'object') {
+      const converted = {}
+      for (const [name, spec] of Object.entries(val)) {
+        if (typeof spec === 'string' && spec.startsWith('workspace:')) {
+          const packageName = name.split('/').pop()
+          converted[name] = `file:../${packageName}`
+        } else {
+          converted[name] = spec
+        }
+      }
+      return converted
+    }
     // skip empty objects and falsey values
     if (typeof val !== 'object' || Object.keys(val).length) {
       return val
@@ -240,7 +255,17 @@ class Shrinkwrap {
     }
 
     if (node.isTop && node.package.devDependencies) {
-      meta.devDependencies = node.package.devDependencies
+      // Convert workspace: protocol to file: protocol for devDependencies
+      const converted = {}
+      for (const [name, spec] of Object.entries(node.package.devDependencies)) {
+        if (typeof spec === 'string' && spec.startsWith('workspace:')) {
+          const packageName = name.split('/').pop()
+          converted[name] = `file:../${packageName}`
+        } else {
+          converted[name] = spec
+        }
+      }
+      meta.devDependencies = converted
     }
 
     for (const key of nodeMetaKeys) {
